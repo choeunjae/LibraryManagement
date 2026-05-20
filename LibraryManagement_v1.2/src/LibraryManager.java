@@ -84,8 +84,12 @@ public class LibraryManager {
 
     /**
      * 도서를 시스템에서 삭제합니다.
+     * <p>삭제하는 메서드 호출 추가-Ref: Github Issue #1(2026.05.20; 조은재)</p>
+     *
      * @param id 삭제할 도서 ID
      * @return 삭제 성공 여부
+     *
+     * @see <a href="https://github.com/choeunjae/LibraryManagement/issues/1">Issue #1: 한 책 삭제 시 DB에서 해당 책이 삭제 안됨</a></p>
      */
     public boolean deleteBook(int id) {
         return bookMap.remove(id) != null;
