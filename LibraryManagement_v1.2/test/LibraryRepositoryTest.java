@@ -100,6 +100,44 @@ class LibraryRepositoryTest {
     }
 
     @Test
+    @DisplayName("SQL 인젝션 공격 구문 입력 시 인증 우회 차단 검증 (loadUser)")
+    void loadUser_SqlInjection_Defense_Test() {
+        // Given: 'admin' 계정이 존재하고, 공격자가 패스워드 창에 우회 구문을 주입하는 상황 정의
+        String targetUserId = "admin";
+        String attackPassword = "' OR '1'='1"; 
+
+        // When: 보안 패치가 적용된 loadUser 메서드로 로그인을 시도
+        User loginResult = repository.loadUser(targetUserId, attackPassword);
+
+        // Then: 파라미터 바인딩 처리로 인해 구문이 평문 처리되어 로그인이 차단(null)되어야 함
+        // 1. 결과값 null 여부 검증
+        assertNull(loginResult, "SQL 인젝션 구문이 주입되었을 때 인증이 우회되지 않고 null을 반환해야 합니다.");
+
+        // 2. [물리 쿼리 검증] 실제 DB에 해당 공격 구문 자체를 비밀번호로 가지는 데이터가 없는지 검증
+        String verifySql = "SELECT COUNT(*) FROM users WHERE user_id = ? AND password = ?";
+        int recordCount = -1;
+
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mariadb://192.168.100.20:3306/library", "cjulib", "security");
+             PreparedStatement pstmt = conn.prepareStatement(verifySql)) {
+
+            pstmt.setString(1, targetUserId);
+            pstmt.setString(2, attackPassword); // 공격 구문 문자열 그대로 검색
+            
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    recordCount = rs.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            fail("테스트 직접 쿼리 검증 중 DB 에러 발생: " + e.getMessage());
+        }
+
+        // 3. 데이터베이스 카운트가 0이어야 안전한 상태임을 상호 교차 확인
+        assertEquals(0, recordCount, "DB에 해당 공격 구문을 그대로 비밀번호로 가진 계정은 없어야 합니다.");
+    }
+
+    @Test
     @DisplayName("DB 도서 개별 삭제 테스트 및 물리 쿼리 검증 (deleteBook)")
     void deleteBook() {
         // Given: 테스트용 도서 데이터를 먼저 DB에 저장하여 삭제할 환경을 구축한다
