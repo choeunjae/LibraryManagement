@@ -1,5 +1,6 @@
 import java.sql.*;
 import java.util.*;
+import org.mindrot.jbcrypt.BCrypt;
 
 public class LibraryRepository {
     // DB 연결 정보
@@ -144,23 +145,26 @@ public class LibraryRepository {
      * @see <a href="https://github.com/sumannam/Java/issues/40">Issue #40: SQL Injection 취약점 개발</a>
      */
     public User loadUser(String id, String pw) {
-        String sql = "SELECT * FROM users WHERE user_id = ? AND password = ?";
+        String sql = "SELECT * FROM users WHERE user_id = ?";
         //System.out.println(sql);
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, id);
-            pstmt.setString(2, pw);
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
-                    // 반환 타입이 User로 바뀌었으므로 이제 에러 없이 정상 작동합니다.
-                    return new User(
-                            rs.getString("user_id"),
-                            rs.getString("password"),
-                            rs.getString("type")
-                    );
+                    String dbPasswordHash = rs.getString("password");
+
+                    if (BCrypt.checkpw(pw, dbPasswordHash)) {
+                        // 반환 타입이 User로 바뀌었으므로 이제 에러 없이 정상 작동합니다.
+                        return new User(
+                                rs.getString("user_id"),
+                                dbPasswordHash,
+                                rs.getString("type")
+                        );
+                    }
                 }
             }
         } catch (SQLException e) {
