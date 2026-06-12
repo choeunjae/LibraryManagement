@@ -33,8 +33,8 @@ class LibraryRepositoryTest {
             stmt.executeUpdate(deleteBooks);
             stmt.executeUpdate(deleteUsers);
 
-            // 테스트를 위한 기본 사용자(admin) 추가
-            stmt.executeUpdate("INSERT INTO users (user_id, password, type) VALUES ('admin', '1111', 'ADMIN')");
+            // 테스트를 위한 기본 사용자(admin) 추가 (비밀번호 '1111'의 BCrypt 해시값 반영)
+            stmt.executeUpdate("INSERT INTO users (user_id, password, type) VALUES ('admin', '$2a$10$w8Yl4P0QpP.oJ0b6vP3N3unRlyhXG10yVbFvRAnw41A7W1w1.S5g2', 'ADMIN')");
 
         } catch (SQLException e) {
             System.err.println("테스트 환경 초기화 실패: " + e.getMessage());
@@ -83,7 +83,7 @@ class LibraryRepositoryTest {
     }
 
     @Test
-    @DisplayName("DB로부터 사용자 데이터 로드 테스트 (loadUsers)")
+    @DisplayName("BCrypt 암호화 기반 로그인 성공 검증 테스트 (loadUser)")
     void loadUsers() {
         // When: 로드 실행 (이제 단일 User 객체를 반환함)
         User user = repository.loadUser("admin", "1111");
@@ -97,6 +97,20 @@ class LibraryRepositoryTest {
 
         // 3. 권한(Type)도 맞는지 확인해보면 좋습니다.
         assertEquals("ADMIN", user.getRole(), "사용자 권한이 'ADMIN'이어야 합니다.");
+    }
+
+    @Test
+    @DisplayName("BCrypt 로그인 시 잘못된 패스워드 입력 시 인증 차단 검증 (loadUser)")
+    void loadUser_WrongPassword_Failure_Test() {
+        // Given: 올바른 ID와 틀린 평문 패스워드 설정
+        String targetUserId = "admin";
+        String wrongPassword = "wrong_password_1234";
+
+        // When: 잘못된 패스워드로 로그인 시도
+        User loginResult = repository.loadUser(targetUserId, wrongPassword);
+
+        // Then: BCrypt.checkpw() 검증 실패로 null이 반환되어야 함
+        assertNull(loginResult, "틀린 비밀번호를 입력했을 때 인증이 실패하여 null을 반환해야 합니다.");
     }
 
     @Test
